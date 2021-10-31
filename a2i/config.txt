@@ -1,0 +1,7 @@
+C:/Users/fmarc/AppData/Roaming/QGIS/QGIS3\profiles\default/python/plugins\a2i
+C:/Users/fmarc/OneDrive/Documents/srpac/a2i/Archaeo-Astro Insight/results
+C:/Program Files/R/R-4.0.2/bin/x64\Rscript
+Yes
+Satellite
+0.5
+2
