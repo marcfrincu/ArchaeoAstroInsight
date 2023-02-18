@@ -1,3 +1,4 @@
+
 SCRIPT_PATH = "C:\\"
 #Archaeo-Astro Insight#
 
@@ -47,6 +48,7 @@ class DeclinationTool(QgsMapToolEmitPoint):
     def __init__(self, canvas, iface, plugin_dir, resultsPath, RPath, scriptSleep, lineWidth, downloadMap):
         self.pointList = []
         self.transformedPoints = []
+        self.lineLayers = []
         self.code = ""
         self.az = 0
         self.altitude = 0
@@ -68,6 +70,24 @@ class DeclinationTool(QgsMapToolEmitPoint):
 
         QgsMapToolEmitPoint.__init__(self, self.canvas)
 
+    def canvasMoveEvent( self, e ):
+        #x = e.pos().x()
+        #y = e.pos().y()
+        #point = self.canvas.getCoordinateTransform().toMapCoordinates(x, y)
+        point = self.toMapCoordinates(self.canvas.mouseLastXY())
+        tr = QgsCoordinateTransform(QgsCoordinateReferenceSystem(QGIS_CRS), QgsCoordinateReferenceSystem(TARGET_CRS), QgsProject.instance())
+        transformed_point = tr.transform(point)
+        if len(self.transformedPoints) < 2:
+            self.transformedPoints.append(transformed_point)
+        else:
+            self.transformedPoints[1] = transformed_point
+
+        if len(self.pointList) == 1:
+            #print ("1st fixed point " + str(self.pointList[0]))
+            #print ("Mouse pos " +  str(point))
+            self.drawLine(self.pointList[0], point)
+            
+
     def canvasPressEvent( self, e ):
         #get point on click
         point = self.toMapCoordinates(self.canvas.mouseLastXY())
@@ -78,7 +98,10 @@ class DeclinationTool(QgsMapToolEmitPoint):
         
         #append points to respective lists
         self.pointList.append(point)
-        self.transformedPoints.append(transformed_point)
+        if len(self.transformedPoints) < 2:
+            self.transformedPoints.append(transformed_point)
+        else:
+            self.transformedPoints[1] = transformed_point
 
         if len(self.transformedPoints) == 1:
             print('Point 1: ({:.4f}, {:.4f})'.format(transformed_point[1], transformed_point[0]))
@@ -119,12 +142,24 @@ class DeclinationTool(QgsMapToolEmitPoint):
             self.pointList = []
             self.transformedPoints = []
     
-    #draw the line and compute azimuth
-    def drawLine(self):
-
-        #create layer for the line
-        start_point = QgsPoint(self.pointList[0].x(),self.pointList[0].y())
-        end_point = QgsPoint(self.pointList[1].x(),self.pointList[1].y())
+    def drawLine(self, start_point = None, end_point = None):
+        rmvLyrByObjList(self.lineLayers)
+        self.lineLayers = []
+        
+        #if points are provided as params then check they are of right type and convert
+        if start_point != None and end_point != None:
+            if isinstance(start_point, QgsPoint) == False:
+                 start_point = QgsPoint(start_point.x(), start_point.y())
+            if isinstance(end_point, QgsPoint) == False:
+                end_point = QgsPoint(end_point.x(), end_point.y())
+        else: # if points are not provided as input params add from point list
+            if len(self.pointList) == 2:
+                #create layer for the line
+                start_point = QgsPoint(self.pointList[0].x(),self.pointList[0].y())
+                end_point = QgsPoint(self.pointList[1].x(),self.pointList[1].y())
+            else:
+                return
+                
         line_layer = QgsVectorLayer('LineString?crs=epsg:3857', 'line', 'memory')
         line_layer.setAbstract('Point one ({:.4f},{:.4f}) and point two ({:.4f},{:.4f})'.format(
             self.transformedPoints[0].y(), self.transformedPoints[0].x(), self.transformedPoints[1].y(), self.transformedPoints[1].x()))
@@ -134,7 +169,7 @@ class DeclinationTool(QgsMapToolEmitPoint):
         seg.setGeometry(QgsGeometry.fromPolyline([start_point, end_point]))
         pr.addFeatures([ seg ])
         QgsProject.instance().addMapLayers([line_layer])
-
+        self.lineLayers.append(line_layer)
             
             #gLine = QgsGeometry.fromPolyline([QgsPoint(self.pointList[0].x(),self.pointList[0].y()), QgsPoint(self.pointList[1].x(),self.pointList[1].y())])
             #self.rubberBand.setToGeometry(gLine, None)
@@ -264,6 +299,11 @@ def azimuth_tool():
 def rmvLyr(lyrname):
     qinst = QgsProject.instance()
     qinst.removeMapLayer(qinst.mapLayersByName(lyrname)[0].id())
+
+def rmvLyrByObjList(layerList):
+    qinst = QgsProject.instance()
+    for layer in layerList:
+        qinst.removeMapLayer(layer)
 
 def set_params():
 
